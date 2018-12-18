@@ -1658,7 +1658,10 @@ $(document).ready(function () {
 
 <div id="TOC">
 <ul>
-<li><a href="#introduction">Introduction</a></li>
+<li><a href="#introduction">Introduction</a><ul>
+<li><a href="#people-based-views-in-progress">People-based views (In Progress)</a></li>
+<li><a href="#summary-of-other-data">Summary of other data</a></li>
+</ul></li>
 <li><a href="#which-are-the-most-popular-schools">Which are the most popular schools?</a></li>
 <li><a href="#breakdown-by-company-schools">Breakdown by company &amp; schools</a><ul>
 <li><a href="#summarise-by-an-arbitrary-vector-of-schools">Summarise by an arbitrary vector of schools</a></li>
@@ -1674,7 +1677,6 @@ $(document).ready(function () {
 <li><a href="#north-america">North America</a></li>
 <li><a href="#east-asia">East Asia</a></li>
 </ul></li>
-<li><a href="#people-based-views-in-progress">People-based views (In Progress)</a></li>
 <li><a href="#network-graph-visualisation-in-progress">Network Graph Visualisation (In Progress)</a><ul>
 <li><a href="#build-out-vertices-edges-data">Build out vertices &amp; edges data</a></li>
 </ul></li>
@@ -1710,12 +1712,65 @@ $(document).ready(function () {
 {"columns":[{"label":["company"],"name":[1],"type":["fctr"],"align":["left"]},{"label":["n"],"name":[2],"type":["int"],"align":["right"]}],"data":[{"1":"advent","2":"346"},{"1":"apax","2":"227"},{"1":"apollo","2":"250"},{"1":"bain-capital","2":"705"},{"1":"blackstone","2":"929"},{"1":"bpea","2":"79"},{"1":"carlyle","2":"752"},{"1":"cinven","2":"122"},{"1":"cvc","2":"345"},{"1":"eqt","2":"368"},{"1":"kkr","2":"698"},{"1":"partners-group","2":"130"},{"1":"permira","2":"256"},{"1":"silver-lake","2":"197"},{"1":"tpg","2":"263"}],"options":{"columns":{"min":{},"max":[10]},"rows":{"min":[10],"max":[10]},"pages":{}}}
   </script>
 </div>
-<p>Here’s a quick summary of the rest of the data in the 5667 records in the dataset – it’s all words, not numbers. Note that the counts beside the company names don’t represent <em>people</em>, but rather the number of <em>qualifications</em> held by the people at that firm. If you have two qualifications, you’ll appear twice in the records. An indication of this cross-over is contained in the <code>education</code> column. We’ll address this later.</p>
+<div id="people-based-views-in-progress" class="section level2">
+<h2>People-based views (In Progress)</h2>
+<p>Note that the counts beside the company names don’t represent <em>people</em>, but rather the number of <em>qualifications</em> held by the people at that firm. If you have two qualifications, you’ll appear twice in the records. Many of the people have more than one degree:</p>
+<pre class="r"><code>data %&gt;%
+  select(education) %&gt;%
+  group_by(education) %&gt;%
+  tally() %&gt;%
+  spread(education, n) %&gt;%
+  mutate(&quot;single degree&quot; = school1 - (school2 + school3),
+         &quot;two degrees&quot; = school2 - school3,
+         &quot;three or more&quot; = school3) %&gt;%
+  select(-starts_with(&quot;school&quot;))</code></pre>
+<div data-pagedtable="false">
+<script data-pagedtable-source type="application/json">
+{"columns":[{"label":["single degree"],"name":[1],"type":["int"],"align":["right"]},{"label":["two degrees"],"name":[2],"type":["int"],"align":["right"]},{"label":["three or more"],"name":[3],"type":["int"],"align":["right"]}],"data":[{"1":"1687","2":"1566","3":"212"}],"options":{"columns":{"min":{},"max":[10]},"rows":{"min":[10],"max":[10]},"pages":{}}}
+  </script>
+</div>
+<p>Let’s break that down by company – who employs the most eggheads?</p>
+<pre class="r"><code>data %&gt;%
+  select(company, education) %&gt;%
+  group_by(company, education) %&gt;%
+  tally() %&gt;%
+  spread(education, n) %&gt;%
+  mutate(&quot;single degree&quot; = school1 - (school2 + school3),
+         &quot;two degrees&quot; = school2 - school3,
+         &quot;three or more&quot; = school3) %&gt;%
+  select(-starts_with(&quot;school&quot;)) %&gt;%
+  arrange(desc(`three or more`)) -&gt;  # backticks fix whitespace
+  eggheads
+
+eggheads</code></pre>
+<div data-pagedtable="false">
+<script data-pagedtable-source type="application/json">
+{"columns":[{"label":["company"],"name":[1],"type":["fctr"],"align":["left"]},{"label":["single degree"],"name":[2],"type":["int"],"align":["right"]},{"label":["two degrees"],"name":[3],"type":["int"],"align":["right"]},{"label":["three or more"],"name":[4],"type":["int"],"align":["right"]}],"data":[{"1":"carlyle","2":"208","3":"212","4":"30"},{"1":"bain-capital","2":"143","3":"225","4":"28"},{"1":"blackstone","2":"301","3":"258","4":"28"},{"1":"kkr","2":"194","3":"198","4":"27"},{"1":"eqt","2":"94","3":"87","4":"25"},{"1":"advent","2":"94","3":"102","4":"12"},{"1":"apax","2":"65","3":"57","4":"12"},{"1":"cvc","2":"127","3":"87","4":"11"},{"1":"permira","2":"84","3":"68","4":"9"},{"1":"apollo","2":"82","3":"68","4":"8"},{"1":"tpg","2":"63","3":"84","4":"8"},{"1":"silver-lake","2":"85","3":"46","4":"5"},{"1":"bpea","2":"13","3":"25","4":"4"},{"1":"cinven","2":"60","3":"25","4":"3"},{"1":"partners-group","2":"74","3":"24","4":"2"}],"options":{"columns":{"min":{},"max":[10]},"rows":{"min":[10],"max":[10]},"pages":{}}}
+  </script>
+</div>
+<p>We really need to look at this in terms of percentages.</p>
+<pre class="r"><code># note to self - be careful, `total` increments with rowsum leading to misleadingly low percentages.
+eggheads$total = rowSums(eggheads[,-1])
+eggheads %&gt;%
+  mutate(`single degree%` = (`single degree`/total)*100,
+         `two degrees%` = (`two degrees`/total)*100,
+         `three or more%` = (`three or more`/total)*100) %&gt;%
+  select(company, contains(&quot;%&quot;)) %&gt;%
+  arrange(desc(`three or more%`))</code></pre>
+<div data-pagedtable="false">
+<script data-pagedtable-source type="application/json">
+{"columns":[{"label":["company"],"name":[1],"type":["fctr"],"align":["left"]},{"label":["single degree%"],"name":[2],"type":["dbl"],"align":["right"]},{"label":["two degrees%"],"name":[3],"type":["dbl"],"align":["right"]},{"label":["three or more%"],"name":[4],"type":["dbl"],"align":["right"]}],"data":[{"1":"eqt","2":"45.63107","3":"42.23301","4":"12.135922"},{"1":"bpea","2":"30.95238","3":"59.52381","4":"9.523810"},{"1":"apax","2":"48.50746","3":"42.53731","4":"8.955224"},{"1":"bain-capital","2":"36.11111","3":"56.81818","4":"7.070707"},{"1":"carlyle","2":"46.22222","3":"47.11111","4":"6.666667"},{"1":"kkr","2":"46.30072","3":"47.25537","4":"6.443914"},{"1":"advent","2":"45.19231","3":"49.03846","4":"5.769231"},{"1":"permira","2":"52.17391","3":"42.23602","4":"5.590062"},{"1":"tpg","2":"40.64516","3":"54.19355","4":"5.161290"},{"1":"apollo","2":"51.89873","3":"43.03797","4":"5.063291"},{"1":"cvc","2":"56.44444","3":"38.66667","4":"4.888889"},{"1":"blackstone","2":"51.27768","3":"43.95230","4":"4.770017"},{"1":"silver-lake","2":"62.50000","3":"33.82353","4":"3.676471"},{"1":"cinven","2":"68.18182","3":"28.40909","4":"3.409091"},{"1":"partners-group","2":"74.00000","3":"24.00000","4":"2.000000"}],"options":{"columns":{"min":{},"max":[10]},"rows":{"min":[10],"max":[10]},"pages":{}}}
+  </script>
+</div>
+</div>
+<div id="summary-of-other-data" class="section level2">
+<h2>Summary of other data</h2>
+<p>Here’s a quick summary of the rest of the data in the 5667 records in the dataset – it’s all words, not numbers.</p>
 <ul>
 <li>We collected data on at least 3672 individuals (note - some names - e.g. Sarah Smith - are common to more than one company. This all comes out in the wash - we break down by name &amp; company. As long as no company has hired -say- <em>two</em> Sarah Smiths, we should be alright)</li>
 <li>There are 1118 individual schools in the dataset. Some of the longtail ones may still be incorrectly coded</li>
 </ul>
-<p>Note that <code>region</code> and <code>region2</code> were manually coded based on location data contained in the bio.</p>
+<p>Note that <code>region</code> and <code>region2</code> refer to the office in which the partner/associate works, and were manually coded based on location data contained in the bio.</p>
 <ul>
 <li>There are 5457 records that contain <code>region</code> macro-region data.</li>
 </ul>
@@ -1735,6 +1790,7 @@ $(document).ready(function () {
   </script>
 </div>
 <p>We should probably code more data for <code>school</code> - to enrich for <em>region</em> and <em>category</em> (e.g. to let us break out Business Schools and Law Schools as a minimum - maybe Med Schools etc as well.)</p>
+</div>
 </div>
 <div id="which-are-the-most-popular-schools" class="section level1">
 <h1>Which are the most popular schools?</h1>
@@ -2155,41 +2211,6 @@ count_regional_qualifications(&quot;South Asia&quot;)</code></pre>
   </script>
 </div>
 </div>
-</div>
-<div id="people-based-views-in-progress" class="section level1">
-<h1>People-based views (In Progress)</h1>
-<p>Up until now, we’ve been looking at this in terms of “degrees” and not “people.” Most of the people have more than one degree:</p>
-<pre class="r"><code>data %&gt;%
-  select(education) %&gt;%
-  group_by(education) %&gt;%
-  tally() %&gt;%
-  spread(education, n) %&gt;%
-  mutate(&quot;single degree&quot; = school1 - (school2 + school3),
-         &quot;two degrees&quot; = school2 - school3,
-         &quot;three or more&quot; = school3) %&gt;%
-  select(-starts_with(&quot;school&quot;))</code></pre>
-<div data-pagedtable="false">
-<script data-pagedtable-source type="application/json">
-{"columns":[{"label":["single degree"],"name":[1],"type":["int"],"align":["right"]},{"label":["two degrees"],"name":[2],"type":["int"],"align":["right"]},{"label":["three or more"],"name":[3],"type":["int"],"align":["right"]}],"data":[{"1":"1687","2":"1566","3":"212"}],"options":{"columns":{"min":{},"max":[10]},"rows":{"min":[10],"max":[10]},"pages":{}}}
-  </script>
-</div>
-<p>Let’s break that down by company – who employs the most eggheads?</p>
-<pre class="r"><code>data %&gt;%
-  select(company, education) %&gt;%
-  group_by(company, education) %&gt;%
-  tally() %&gt;%
-  spread(education, n) %&gt;%
-  mutate(&quot;single degree&quot; = school1 - (school2 + school3),
-         &quot;two degrees&quot; = school2 - school3,
-         &quot;three or more&quot; = school3) %&gt;%
-  select(-starts_with(&quot;school&quot;)) %&gt;%
-  arrange(desc(`three or more`))  # backticks fix whitespace</code></pre>
-<div data-pagedtable="false">
-<script data-pagedtable-source type="application/json">
-{"columns":[{"label":["company"],"name":[1],"type":["fctr"],"align":["left"]},{"label":["single degree"],"name":[2],"type":["int"],"align":["right"]},{"label":["two degrees"],"name":[3],"type":["int"],"align":["right"]},{"label":["three or more"],"name":[4],"type":["int"],"align":["right"]}],"data":[{"1":"carlyle","2":"208","3":"212","4":"30"},{"1":"bain-capital","2":"143","3":"225","4":"28"},{"1":"blackstone","2":"301","3":"258","4":"28"},{"1":"kkr","2":"194","3":"198","4":"27"},{"1":"eqt","2":"94","3":"87","4":"25"},{"1":"advent","2":"94","3":"102","4":"12"},{"1":"apax","2":"65","3":"57","4":"12"},{"1":"cvc","2":"127","3":"87","4":"11"},{"1":"permira","2":"84","3":"68","4":"9"},{"1":"apollo","2":"82","3":"68","4":"8"},{"1":"tpg","2":"63","3":"84","4":"8"},{"1":"silver-lake","2":"85","3":"46","4":"5"},{"1":"bpea","2":"13","3":"25","4":"4"},{"1":"cinven","2":"60","3":"25","4":"3"},{"1":"partners-group","2":"74","3":"24","4":"2"}],"options":{"columns":{"min":{},"max":[10]},"rows":{"min":[10],"max":[10]},"pages":{}}}
-  </script>
-</div>
-<p>We really need to look at this in terms of percentages</p>
 </div>
 <div id="network-graph-visualisation-in-progress" class="section level1">
 <h1>Network Graph Visualisation (In Progress)</h1>
